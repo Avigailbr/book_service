@@ -13,15 +13,18 @@ type Connectors struct {
 }
 
 func NewConnectors() error {
+	esClient, err := BookConnectors.NewElasticClient(config.ElasticUrl, config.IndexName, config.TypeName)
+	if err != nil {
+		return err
+	}
+	redisClient, err = BookConnectors.NewRedisClient(config.RedisAdd, config.RedisDB)
+	if err != nil {
+		return err
+	}
+	
 	BookConnectors = &Connectors{
-	}
-	_, err := BookConnectors.NewElasticClient(config.ElasticUrl, config.IndexName, config.TypeName)
-	if err != nil {
-		return err
-	}
-	_, err = BookConnectors.NewRedisClient(config.RedisAdd, config.RedisDB)
-	if err != nil {
-		return err
+	    ElasticClient: esClient,
+ 	    RedisClients: redisClient,
 	}
 	return nil
 }
