@@ -2,12 +2,16 @@ package service
 
 import (
 	"fmt"
-	"github.com/avigailbr/book_service/connectors"
-	"github.com/avigailbr/book_service/controllers"
+	"github.com/avigailbr/book_service/datastore"
 	"github.com/avigailbr/book_service/models"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
+
+type UpdateBook struct {
+	Id    string `json:"id" binding:"required`
+	Title string `json:"title" binding:"required"`
+}
 
 func Ping(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
@@ -17,7 +21,8 @@ func Ping(c *gin.Context) {
 
 func BookInfo(c *gin.Context) {
 	id := c.Param("id")
-	book, err := controllers.BookController.GetBook(id)
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	book, err := db.GetBook(id)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -34,8 +39,8 @@ func AddBook(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	id, err := controllers.BookController.InsertBook(&book)
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	id, err := db.InsertBook(&book)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -53,12 +58,13 @@ func AddBook(c *gin.Context) {
 
 func UpdateBookTitle(c *gin.Context) {
 
-	var book models.UpdateBook
+	var book UpdateBook
 	if err := c.ShouldBind(&book); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := controllers.BookController.UpdateBook(book.Id, map[string]interface{}{"title": book.Title})
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	err := db.UpdateBook(book.Id, map[string]interface{}{"title": book.Title})
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -75,7 +81,8 @@ func UpdateBookTitle(c *gin.Context) {
 func DeleteBook(c *gin.Context) {
 	id := c.Param("id")
 
-	err := controllers.BookController.DeleteBook(id)
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	err := db.DeleteBook(id)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -98,8 +105,9 @@ func searchBooks(c *gin.Context) {
 		"author_name": author_name,
 		"price_range": price_range,
 	}
-	books, err := controllers.BookController.Search(fields)
-	if err != nil{
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	books, err := db.Search(fields)
+	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 
@@ -112,8 +120,9 @@ func searchBooks(c *gin.Context) {
 
 func storeInfo(c *gin.Context) {
 
-	info, err := controllers.BookController.Info()
-	if err != nil{
+	db := c.MustGet("DB").(datastore.IBookStorer)
+	info, err := db.Info()
+	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 
@@ -126,17 +135,14 @@ func storeInfo(c *gin.Context) {
 
 func activityInfo(c *gin.Context) {
 	username := c.Query("username")
-	rdb := connectors.BookConnectors.RedisClients
 
-	items, err := rdb.ZRevRangeWithScores(username, 0, 2).Result()
-	if err != nil {
+	cache := c.MustGet("Cache").(datastore.IActivityCacher)
+
+	actions, err := cache.GetLastActions(username)
+
+	if err !=nil{
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	var actions []string
-	for _, zItem := range items {
-		actions = append(actions, fmt.Sprint(zItem.Member))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

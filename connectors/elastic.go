@@ -10,7 +10,7 @@ type ElasticClient struct {
 	DocType string
 }
 
-func (c *Connectors) NewElasticClient(url, index, doctype string) (*ElasticClient, error) {
+func NewElasticClient(url, index, doctype string) (*ElasticClient, error) {
 
 	client, err := elastic.NewClient(elastic.SetURL(url))
 	if err != nil {
@@ -21,6 +21,6 @@ func (c *Connectors) NewElasticClient(url, index, doctype string) (*ElasticClien
 		Index:   index,
 		DocType: doctype,
 	}
-	c.ElasticClient = elastic
+
 	return elastic, nil
 }

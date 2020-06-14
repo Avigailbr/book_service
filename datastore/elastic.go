@@ -1,9 +1,9 @@
-package controllers
+package datastore
 
 import (
 	"context"
 	"encoding/json"
-	"github.com/avigailbr/book_service/config"
+	"errors"
 	"github.com/avigailbr/book_service/connectors"
 	"github.com/avigailbr/book_service/models"
 	"gopkg.in/olivere/elastic.v5"
@@ -12,28 +12,28 @@ import (
 	"strings"
 )
 
-var (
-	BookController IBookController
+const (
+	SearchResultFrom = 0
+	SearchResultSize = 10
 )
 
-type IBookController interface {
-	GetBook(id string) (*models.Book, error)
-	InsertBook(book *models.Book) (string, error)
-	UpdateBook(id string, fields map[string]interface{}) error
-	DeleteBook(id string) error
-	Search(fields map[string]string) ([]models.Book, error)
-	Info() (map[string]interface{}, error)
+type ElasticBookStore struct {
+	Client *connectors.ElasticClient
 }
 
-type ElasticBookController struct {
+func NewElasticBookStore(url, index, doctype string) (IBookStorer, error) {
+	esClient, err := connectors.NewElasticClient(url, index, doctype)
+	if err != nil {
+		return nil, err
+	}
+	esBookStore := &ElasticBookStore{
+		Client: esClient,
+	}
+	return esBookStore, nil
 }
 
-func NewElasticBookController() IBookController {
-	return &ElasticBookController{}
-}
-
-func (e ElasticBookController) GetBook(id string) (*models.Book, error) {
-	es := connectors.BookConnectors.ElasticClient
+func (e ElasticBookStore) GetBook(id string) (*models.Book, error) {
+	es := e.Client
 	ctx := context.Background()
 	get, err := es.Client.Get().
 		Index(es.Index).
@@ -55,8 +55,8 @@ func (e ElasticBookController) GetBook(id string) (*models.Book, error) {
 
 }
 
-func (e ElasticBookController) InsertBook(book *models.Book) (string, error) {
-	es := connectors.BookConnectors.ElasticClient
+func (e ElasticBookStore) InsertBook(book *models.Book) (string, error) {
+	es := e.Client
 	ctx := context.Background()
 
 	data, err := json.Marshal(book)
@@ -78,8 +78,8 @@ func (e ElasticBookController) InsertBook(book *models.Book) (string, error) {
 
 }
 
-func (e ElasticBookController) UpdateBook(id string, fields map[string]interface{}) error {
-	es := connectors.BookConnectors.ElasticClient
+func (e ElasticBookStore) UpdateBook(id string, fields map[string]interface{}) error {
+	es := e.Client
 	ctx := context.Background()
 
 	_, err := es.Client.Update().
@@ -95,8 +95,8 @@ func (e ElasticBookController) UpdateBook(id string, fields map[string]interface
 	return nil
 }
 
-func (e ElasticBookController) DeleteBook(id string) error {
-	es := connectors.BookConnectors.ElasticClient
+func (e ElasticBookStore) DeleteBook(id string) error {
+	es := e.Client
 	// must pass a context to execute each service
 	ctx := context.Background()
 	_, err := es.Client.Delete().
@@ -110,22 +110,16 @@ func (e ElasticBookController) DeleteBook(id string) error {
 	return nil
 }
 
-func (e ElasticBookController) Search(fields map[string]string) ([]models.Book, error) {
+func (e ElasticBookStore) Search(fields map[string]string) ([]models.Book, error) {
 
 	query := elastic.NewBoolQuery()
 
 	if title, ok := fields["title"]; ok && title != "" {
 		titleMatchQuery := elastic.NewMatchQuery("title", title)
+		query.Must(titleMatchQuery)
+	}
 
-		if author, ok := fields["author_name"]; ok && author != "" {
-			authorMatchQuery := elastic.NewMatchQuery("author_name", author)
-			query.Must(titleMatchQuery, authorMatchQuery)
-
-		} else {
-			query.Must(titleMatchQuery)
-		}
-
-	} else if author, ok := fields["author_name"]; ok && author != "" {
+	if author, ok := fields["author_name"]; ok && author != "" {
 		authorMatchQuery := elastic.NewMatchQuery("author_name", author)
 		query.Must(authorMatchQuery)
 	}
@@ -134,28 +128,27 @@ func (e ElasticBookController) Search(fields map[string]string) ([]models.Book, 
 		var err error
 		s := strings.Split(price, "-")
 		if len(s) != 2 {
-			return nil, models.NewStringError("Conversion failed for `Price_range` field")
+			return nil, errors.New("Conversion failed for `Price_range` field")
 		}
 		if from, err = strconv.Atoi(s[0]); err != nil {
-			return nil, models.NewStringError("Conversion failed for `Price_range` field")
+			return nil, errors.New("Conversion failed for `Price_range` field")
 		}
 		if to, err = strconv.Atoi(s[1]); err != nil {
-			return nil, models.NewStringError("Conversion failed for `Price_range` field")
+			return nil, errors.New("Conversion failed for `Price_range` field")
 		}
 		priceFilterQuery := elastic.NewRangeQuery("price").From(from).To(to)
 		query.Filter(priceFilterQuery)
 	}
 
-	es := connectors.BookConnectors.ElasticClient
+	es := e.Client
 	ctx := context.Background()
 
 	searchResult, err := es.Client.Search().
 		Index(es.Index).
 		Type(es.DocType).
 		Query(query).
-		From(config.SearchResultFrom).
-		Size(config.SearchResultSize).
-		Pretty(true).
+		From(SearchResultFrom).
+		Size(SearchResultSize).
 		Do(ctx)
 
 	if err != nil {
@@ -181,11 +174,11 @@ func (e ElasticBookController) Search(fields map[string]string) ([]models.Book, 
 
 }
 
-func (e ElasticBookController) Info() (map[string]interface{}, error) {
+func (e ElasticBookStore) Info() (map[string]interface{}, error) {
 
 	info := make(map[string]interface{})
 
-	es := connectors.BookConnectors.ElasticClient
+	es := e.Client
 	ctx := context.Background()
 
 	sr, err := es.Client.Search().Aggregation("author_count", elastic.NewCardinalityAggregation().Field("author_name.keyword")).
@@ -198,16 +191,8 @@ func (e ElasticBookController) Info() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	var authorsCount int
-	authors, found := sr.Aggregations.Terms("author_count")
+	authorsCount, found := sr.Aggregations["author_count"]
 	if found {
-		for _, count := range authors.Aggregations {
-			if i, err := json.Marshal(&count); err != nil {
-				return nil, err
-			} else if authorsCount, err = strconv.Atoi(string(i)); err != nil {
-				return nil, err
-			}
-		}
 		info["author_count"] = authorsCount
 		info["books_count"] = sr.Hits.TotalHits
 

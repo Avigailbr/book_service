@@ -1,45 +1,28 @@
 package middlewares
 
 import (
+	"errors"
 	"fmt"
-	"github.com/avigailbr/book_service/connectors"
-	"github.com/avigailbr/book_service/models"
+	"github.com/avigailbr/book_service/datastore"
 	"github.com/gin-gonic/gin"
-	"gopkg.in/redis.v5"
 	"net/http"
 )
 
 var counter float64
 
-func WriteToRedis(userId, method, route string) error {
-	//score := float64(time.Now().Nanosecond()) - don't work
-	score:= counter
-	counter+=1
-	value := "method: " + method + ", route: " + route
 
-	rdb := connectors.BookConnectors.RedisClients
-	_, err := rdb.ZAdd(userId, redis.Z{score, value}).Result()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func WriteActionToRedis() gin.HandlerFunc {
-
-	// Flush redis - only happens once
-	rdb := connectors.BookConnectors.RedisClients
-	rdb.FlushAll()
+func WriteActionToCache() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+		cache := c.MustGet("Cache").(datastore.IActivityCacher)
 		username := c.Query("username")
 		if username == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, models.NewStringError("username is required").Error())
+			c.AbortWithStatusJSON(http.StatusBadRequest, errors.New("username is required"))
 			return
 		}
 		c.Next()
 
-		if err := WriteToRedis(username, c.Request.Method, c.Request.RequestURI); err != nil {
+		if err := cache.AddAction(username, c.Request.Method, c.Request.RequestURI); err != nil {
 			fmt.Printf("Write action to Redis failed. Method: %v, RequestURI: %v\n", c.Request.Method, c.Request.RequestURI)
 		}
 

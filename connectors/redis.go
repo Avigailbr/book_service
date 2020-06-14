@@ -4,17 +4,24 @@ import (
 	"gopkg.in/redis.v5"
 )
 
-func (c *Connectors) NewRedisClient(addr string, db int) (*redis.Client, error) {
+type RedisClient struct {
+	*redis.Client
+}
+
+func NewRedisClient(addr string) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: "", // no password set
-		DB:       0,
+		DB:       0,  // use default DB
 	})
 
-	if _, err := client.Ping().Result(); err != nil {
+	redisClient := &RedisClient{
+		client,
+	}
+
+	if _, err := redisClient.Ping().Result(); err != nil {
 		return nil, err
 	}
 
-	c.RedisClients = client
-	return client, nil
+	return redisClient, nil
 }

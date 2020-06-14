@@ -5,9 +5,16 @@ import (
 	"time"
 )
 
+type Book struct {
+	Title       string     `json:"title" binding:"required"`
+	AuthorName  string     `json:"author_name" binding:"required"`
+	Price       float64    `json:"price" binding:"required"`
+	Ebook       bool       `json:"ebook, ebook_available"`
+	PublishDate CustomTime `json:"publish_date" binding:"required"`
+}
+
 const ctLayout = "2006-01-02T00:00:00Z"
 
-// TODO (ASK) - where to put this?
 type CustomTime struct {
 	time.Time
 }
@@ -32,17 +39,4 @@ func (ct *CustomTime) marshalJSON() ([]byte, error) {
 	s := ct.Time.Format(ctLayout)
 	return []byte(s), nil
 
-}
-
-type Book struct {
-	Title       string     `json:"title" binding:"required"`
-	AuthorName  string     `json:"author_name" binding:"required"`
-	Price       float64    `json:"price" binding:"required"`
-	Ebook       bool       `json:"ebook, ebook_available"`
-	PublishDate CustomTime `json:"publish_date" binding:"required"`
-}
-
-type UpdateBook struct {
-	Id          string     `json:"id" binding:"required`
-	Title       string     `json:"title" binding:"required"`
 }
