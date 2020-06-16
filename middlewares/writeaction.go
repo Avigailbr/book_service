@@ -8,13 +8,10 @@ import (
 	"net/http"
 )
 
-var counter float64
-
-
 func WriteActionToCache() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		cache := c.MustGet("Cache").(datastore.IActivityCacher)
+		cache := c.MustGet("Cache").(datastore.ActivityCacher)
 		username := c.Query("username")
 		if username == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, errors.New("username is required"))

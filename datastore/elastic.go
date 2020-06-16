@@ -21,7 +21,7 @@ type ElasticBookStore struct {
 	Client *connectors.ElasticClient
 }
 
-func NewElasticBookStore(url, index, doctype string) (IBookStorer, error) {
+func NewElasticBookStore(url, index, doctype string) (*ElasticBookStore, error) {
 	esClient, err := connectors.NewElasticClient(url, index, doctype)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func NewElasticBookStore(url, index, doctype string) (IBookStorer, error) {
 	return esBookStore, nil
 }
 
-func (e ElasticBookStore) GetBook(id string) (*models.Book, error) {
+func (e ElasticBookStore) Get(id string) (*models.Book, error) {
 	es := e.Client
 	ctx := context.Background()
 	get, err := es.Client.Get().
@@ -55,7 +55,7 @@ func (e ElasticBookStore) GetBook(id string) (*models.Book, error) {
 
 }
 
-func (e ElasticBookStore) InsertBook(book *models.Book) (string, error) {
+func (e ElasticBookStore) Insert(book *models.Book) (string, error) {
 	es := e.Client
 	ctx := context.Background()
 
@@ -78,7 +78,7 @@ func (e ElasticBookStore) InsertBook(book *models.Book) (string, error) {
 
 }
 
-func (e ElasticBookStore) UpdateBook(id string, fields map[string]interface{}) error {
+func (e ElasticBookStore) Update(id string, fields map[string]interface{}) error {
 	es := e.Client
 	ctx := context.Background()
 
@@ -95,7 +95,7 @@ func (e ElasticBookStore) UpdateBook(id string, fields map[string]interface{}) e
 	return nil
 }
 
-func (e ElasticBookStore) DeleteBook(id string) error {
+func (e ElasticBookStore) Delete(id string) error {
 	es := e.Client
 	// must pass a context to execute each service
 	ctx := context.Background()

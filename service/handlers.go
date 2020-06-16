@@ -21,8 +21,8 @@ func Ping(c *gin.Context) {
 
 func BookInfo(c *gin.Context) {
 	id := c.Param("id")
-	db := c.MustGet("DB").(datastore.IBookStorer)
-	book, err := db.GetBook(id)
+	db := c.MustGet("DB").(datastore.BookStorer)
+	book, err := db.Get(id)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -39,8 +39,8 @@ func AddBook(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	db := c.MustGet("DB").(datastore.IBookStorer)
-	id, err := db.InsertBook(&book)
+	db := c.MustGet("DB").(datastore.BookStorer)
+	id, err := db.Insert(&book)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -63,8 +63,8 @@ func UpdateBookTitle(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	db := c.MustGet("DB").(datastore.IBookStorer)
-	err := db.UpdateBook(book.Id, map[string]interface{}{"title": book.Title})
+	db := c.MustGet("DB").(datastore.BookStorer)
+	err := db.Update(book.Id, map[string]interface{}{"title": book.Title})
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -81,8 +81,8 @@ func UpdateBookTitle(c *gin.Context) {
 func DeleteBook(c *gin.Context) {
 	id := c.Param("id")
 
-	db := c.MustGet("DB").(datastore.IBookStorer)
-	err := db.DeleteBook(id)
+	db := c.MustGet("DB").(datastore.BookStorer)
+	err := db.Delete(id)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -105,7 +105,7 @@ func searchBooks(c *gin.Context) {
 		"author_name": author_name,
 		"price_range": price_range,
 	}
-	db := c.MustGet("DB").(datastore.IBookStorer)
+	db := c.MustGet("DB").(datastore.BookStorer)
 	books, err := db.Search(fields)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -120,7 +120,7 @@ func searchBooks(c *gin.Context) {
 
 func storeInfo(c *gin.Context) {
 
-	db := c.MustGet("DB").(datastore.IBookStorer)
+	db := c.MustGet("DB").(datastore.BookStorer)
 	info, err := db.Info()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -136,7 +136,7 @@ func storeInfo(c *gin.Context) {
 func activityInfo(c *gin.Context) {
 	username := c.Query("username")
 
-	cache := c.MustGet("Cache").(datastore.IActivityCacher)
+	cache := c.MustGet("Cache").(datastore.ActivityCacher)
 
 	actions, err := cache.GetLastActions(username)
 

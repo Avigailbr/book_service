@@ -9,7 +9,7 @@ type RedisCache struct {
 	Client *connectors.RedisClient
 }
 
-func NewRedisCache(addr string) (IActivityCacher, error) {
+func NewRedisCache(addr string) (*RedisCache, error) {
 	redisClient, err := connectors.NewRedisClient(addr)
 	if err != nil {
 		return nil, err
